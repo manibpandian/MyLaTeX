@@ -5,30 +5,49 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>File Tree Explorer</title>
   <link rel="stylesheet" href="styles.css">
+  
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  
+  <!-- React -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Monaco Editor (direct CDN approach) -->
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.34.1/min/vs/loader.js"></script>
 </head>
 <body>
   <div id="root">Loading...</div>
-  <script>
-    // Debug script loading
-    window.addEventListener('error', function(e) {
-      console.error('Script loading error:', e.filename, e.message);
-      document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">Error loading scripts. Check console for details.</div>';
-    });
-    
-    // Check if React loaded
-    window.addEventListener('load', function() {
-      if (typeof React === 'undefined') {
-        console.error('React not loaded');
-        document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">React failed to load. Check internet connection.</div>';
-      } else {
-        console.log('React loaded successfully');
-      }
-    });
-  </script>
+  
+  <!-- Icons -->
   <script src="icons.js"></script>
-  <script type="text/babel" src="app.js"></script>
+  
+  <!-- Utilities -->
+  <script type="text/babel" src="js/utils/validators.js"></script>
+  
+  <!-- Contexts -->
+  <script type="text/babel" src="js/contexts/TreeContext.js"></script>
+  <script type="text/babel" src="js/contexts/NotificationContext.js"></script>
+  
+  <!-- Hooks -->
+  <script type="text/babel" src="js/hooks/useFileSystem.js"></script>
+  
+  <!-- Components -->
+  <script type="text/babel" src="js/components/ErrorBoundary.js"></script>
+  <script type="text/babel" src="js/components/TreeNode.js"></script>
+  <script type="text/babel" src="js/components/TreeView.js"></script>
+  
+  <!-- Main App -->
+  <script type="text/babel" src="js/app.js"></script>
+  
+  <!-- Splitter functionality -->
+  <script src="js/utils/splitters.js"></script>
+  
+  <!-- Monaco Editor initialization -->
+  <script src="js/utils/monacoSetup.js"></script>
+  
+  <!-- PDF Renderer -->
+  <script src="js/utils/pdfRenderer.js"></script>
 </body>
 </html>
