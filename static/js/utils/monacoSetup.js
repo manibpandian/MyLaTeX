@@ -130,6 +130,7 @@ window.initializeMonacoEditor = initializeMonaco;
 
 // Setup editor toolbar auto-hide
 let editorToolbarHideTimeout = null;
+let editorToolbarShowTimeout = null;
 
 const setupEditorToolbarAutoHide = () => {
   const editorPane = document.getElementById('editor-pane');
@@ -140,16 +141,33 @@ const setupEditorToolbarAutoHide = () => {
     return;
   }
   
-  const showToolbar = () => {
-    toolbar.classList.add('visible');
+  const showToolbar = (e) => {
+    // Only show if mouse is in top 100px of editor pane
+    const rect = editorPane.getBoundingClientRect();
+    const mouseY = e.clientY - rect.top;
     
-    if (editorToolbarHideTimeout) {
-      clearTimeout(editorToolbarHideTimeout);
+    if (mouseY > 100) {
+      return; // Don't show if mouse is not near top
     }
     
-    editorToolbarHideTimeout = setTimeout(() => {
-      toolbar.classList.remove('visible');
-    }, 2000);
+    // Clear any pending show timeout
+    if (editorToolbarShowTimeout) {
+      clearTimeout(editorToolbarShowTimeout);
+    }
+    
+    // Delay showing by 500ms to avoid accidental triggers
+    editorToolbarShowTimeout = setTimeout(() => {
+      toolbar.classList.add('visible');
+      
+      if (editorToolbarHideTimeout) {
+        clearTimeout(editorToolbarHideTimeout);
+      }
+      
+      // Hide after 1 second of inactivity
+      editorToolbarHideTimeout = setTimeout(() => {
+        toolbar.classList.remove('visible');
+      }, 1000);
+    }, 500);
   };
   
   editorPane.addEventListener('mousemove', showToolbar);
@@ -158,13 +176,16 @@ const setupEditorToolbarAutoHide = () => {
     if (editorToolbarHideTimeout) {
       clearTimeout(editorToolbarHideTimeout);
     }
+    if (editorToolbarShowTimeout) {
+      clearTimeout(editorToolbarShowTimeout);
+    }
     toolbar.classList.add('visible');
   });
   
   toolbar.addEventListener('mouseleave', () => {
     editorToolbarHideTimeout = setTimeout(() => {
       toolbar.classList.remove('visible');
-    }, 2000);
+    }, 500);
   });
 };
 
