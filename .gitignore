@@ -87,3 +87,17 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# User documents (exclude user-generated content)
+documents/
+
+# Keep templates folder (should be tracked)
+!templates/

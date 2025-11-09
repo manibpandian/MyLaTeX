@@ -16,6 +16,7 @@ A modern, interactive file tree explorer built with vanilla React that leverages
 - **📱 Responsive**: Works on desktop browsers with File System Access API support
 - **🎨 Elegant Status Messages**: Subtle feedback for all operations
 - **🛡️ Error Handling**: Comprehensive error boundaries and validation
+- **🐍 Flask Backend**: Python Flask backend ready for API extensions
 
 ## 🚀 Demo
 
@@ -31,21 +32,45 @@ A modern, interactive file tree explorer built with vanilla React that leverages
 
 ## 🛠️ Installation
 
-### Option 1: Direct Download
-1. Clone or download this repository
-2. Open [index.html](cci:7://file:///Users/Mani/Desktop/tree/index.html:0:0-0:0) in a supported browser
-3. Serve from a local web server (required for File System Access API)
-
-### Option 2: Local Development Server
+### Option 1: Flask Development Server (Recommended)
 ```bash
 # Clone the repository
-git clone [https://github.com/your-username/file-tree-explorer.git](https://github.com/your-username/file-tree-explorer.git)
-cd file-tree-explorer
+git clone https://github.com/manibpandian/MyLaTeX.git
+cd MyLaTeX
 
-# Serve with Python (if you have Python installed) 
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the Flask app
+python app.py
+
+# Open http://localhost:5000 in your browser
+```
+
+### Option 2: Docker 🐳 (Production Ready)
+```bash
+# Clone the repository
+git clone https://github.com/manibpandian/MyLaTeX.git
+cd MyLaTeX
+
+# Build and run with Docker Compose
+docker-compose up -d
+
+# Open http://localhost:5000 in your browser
+
+# View logs
+docker-compose logs -f
+
+# To stop the container
+docker-compose down
+```
+
+### Option 3: Static Server (No Backend)
+```bash
+# Serve with Python
 python -m http.server 8000
 # OR with Node.js
-npx serve .
-# OR with any other local server
+npx serve static
 
 # Open http://localhost:8000 in your browser
+```

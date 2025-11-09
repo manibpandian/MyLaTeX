@@ -172,9 +172,40 @@ const useFileSystem = (addNotification) => {
     };
   };
 
-  // Load real directory structure
+  // Load directory from backend API
+  const loadBackendDirectory = async () => {
+    try {
+      const response = await fetch('/api/documents/tree');
+      const data = await response.json();
+      
+      if (data.success) {
+        // Mark as backend mode
+        setRootDirectoryHandle({ isBackend: true, root: data.root });
+        return data.tree;
+      } else {
+        throw new Error(data.error || 'Failed to load documents');
+      }
+    } catch (error) {
+      console.error('Error loading backend directory:', error);
+      alert('Failed to load documents from server: ' + error.message);
+      return null;
+    }
+  };
+
+  // Load real directory structure (File System Access API)
   const loadRealDirectory = async () => {
     try {
+      // Check if we should use backend mode (Docker environment)
+      // Try backend first, fall back to File System Access API
+      try {
+        const backendTree = await loadBackendDirectory();
+        if (backendTree) {
+          return backendTree;
+        }
+      } catch (backendError) {
+        console.log('Backend not available, using File System Access API');
+      }
+
       if ('showDirectoryPicker' in window) {
         const dirHandle = await window.showDirectoryPicker({
           mode: 'readwrite'
@@ -239,6 +270,26 @@ const useFileSystem = (addNotification) => {
 
   // Move node to trash
   const moveRealNodeToTrash = async (nodeId) => {
+    // Check if using backend mode
+    if (rootDirectoryHandle && rootDirectoryHandle.isBackend) {
+      try {
+        const response = await fetch(`/api/documents/trash/${nodeId}`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to move to trash');
+        }
+        
+        const newTree = await loadBackendDirectory();
+        return newTree;
+      } catch (error) {
+        throw new Error(`Failed to move to trash: ${error.message}`);
+      }
+    }
+
+    // File System Access API mode
     const pathParts = nodeId.split('/');
     const itemName = pathParts[pathParts.length - 1];
     const parentPath = pathParts.slice(0, -1).join('/');
@@ -289,6 +340,28 @@ const useFileSystem = (addNotification) => {
 
   // Restore from trash
   const restoreFromTrash = async (trashNodeId, node = null) => {
+    // Check if using backend mode
+    if (rootDirectoryHandle && rootDirectoryHandle.isBackend) {
+      try {
+        const response = await fetch(`/api/documents/restore/${trashNodeId}`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to restore');
+        }
+        
+        const newTree = await loadBackendDirectory();
+        addNotification('Item restored successfully', 'success');
+        return newTree;
+      } catch (error) {
+        addNotification(`Failed to restore: ${error.message}`, 'error');
+        throw error;
+      }
+    }
+
+    // File System Access API mode
     try {
       const trashHandle = await rootDirectoryHandle.getDirectoryHandle('.trash');
       
@@ -354,6 +427,25 @@ const useFileSystem = (addNotification) => {
 
   // Delete node permanently
   const deleteRealNode = async (nodeId) => {
+    // Check if using backend mode
+    if (rootDirectoryHandle && rootDirectoryHandle.isBackend) {
+      try {
+        const response = await fetch(`/api/documents/delete/${nodeId}`, {
+          method: 'DELETE'
+        });
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to delete');
+        }
+        
+        return;
+      } catch (error) {
+        throw new Error(`Failed to delete: ${error.message}`);
+      }
+    }
+
+    // File System Access API mode
     const pathParts = nodeId.split('/');
     const itemName = pathParts[pathParts.length - 1];
     const parentPath = pathParts.slice(0, -1).join('/');
@@ -374,6 +466,29 @@ const useFileSystem = (addNotification) => {
 
   // Add folder
   const addRealFolder = async (parentId, setOpenNodes, setEditingNodeId) => {
+    // Check if using backend mode
+    if (rootDirectoryHandle && rootDirectoryHandle.isBackend) {
+      try {
+        const folderPath = parentId ? `${parentId}/NewFolder` : 'NewFolder';
+        const response = await fetch('/api/documents/mkdir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: folderPath })
+        });
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to create folder');
+        }
+        
+        const newTree = await loadBackendDirectory();
+        return newTree;
+      } catch (error) {
+        throw new Error(`Failed to create folder: ${error.message}`);
+      }
+    }
+
+    // File System Access API mode
     const rootId = rootDirectoryHandle.name;
     const actualParentId = parentId === '' ? rootId : parentId;
     const parentHandle = parentId === '' ? rootDirectoryHandle : directoryHandles.get(parentId);
@@ -426,6 +541,32 @@ const useFileSystem = (addNotification) => {
 
   // Add file
   const addRealFile = async (parentId, setOpenNodes, setEditingNodeId) => {
+    // Check if using backend mode
+    if (rootDirectoryHandle && rootDirectoryHandle.isBackend) {
+      try {
+        const filePath = parentId ? `${parentId}/NewFile.tex` : 'NewFile.tex';
+        const response = await fetch('/api/documents/write', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            path: filePath,
+            content: '% New LaTeX file\n\\documentclass{article}\n\\begin{document}\n\n\\end{document}'
+          })
+        });
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to create file');
+        }
+        
+        const newTree = await loadBackendDirectory();
+        return newTree;
+      } catch (error) {
+        throw new Error(`Failed to create file: ${error.message}`);
+      }
+    }
+
+    // File System Access API mode
     const rootId = rootDirectoryHandle.name;
     const actualParentId = parentId === '' ? rootId : parentId;
     const parentHandle = parentId === '' ? rootDirectoryHandle : directoryHandles.get(parentId);
@@ -488,6 +629,30 @@ const useFileSystem = (addNotification) => {
     
     if (oldName === newName) {
       return null;
+    }
+
+    // Check if using backend mode
+    if (rootDirectoryHandle && rootDirectoryHandle.isBackend) {
+      try {
+        const response = await fetch('/api/documents/rename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            oldPath: nodeId,
+            newName: newName
+          })
+        });
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to rename');
+        }
+        
+        const newTree = await loadBackendDirectory();
+        return newTree;
+      } catch (error) {
+        throw new Error(`Failed to rename: ${error.message}`);
+      }
     }
     
     const parentHandle = directoryHandles.get(parentPath);
@@ -554,10 +719,48 @@ const useFileSystem = (addNotification) => {
 
   // Read file content for Monaco editor
   const readFileContent = async (filePath) => {
+    console.log('[readFileContent] Called with filePath:', filePath);
+    
     if (!rootDirectoryHandle) {
+      console.error('[readFileContent] No directory connected');
       throw new Error('No directory connected');
     }
 
+    console.log('[readFileContent] rootDirectoryHandle:', rootDirectoryHandle);
+
+    // Check if using backend mode
+    if (rootDirectoryHandle.isBackend) {
+      console.log('[readFileContent] Using backend mode');
+      try {
+        const url = `/api/documents/read/${filePath}`;
+        console.log('[readFileContent] Fetching from:', url);
+        
+        const response = await fetch(url);
+        console.log('[readFileContent] Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[readFileContent] Error response:', errorText);
+          throw new Error(`Failed to read file: ${errorText}`);
+        }
+        
+        const content = await response.text();
+        const fileName = filePath.split('/').pop();
+        
+        console.log('[readFileContent] Successfully read file:', fileName, 'Content length:', content.length);
+        
+        return {
+          content,
+          fileName,
+          filePath
+        };
+      } catch (error) {
+        console.error('[readFileContent] Error reading file:', error);
+        throw new Error(`Failed to read file: ${error.message}`);
+      }
+    }
+
+    // File System Access API mode
     try {
       let pathParts = filePath.split('/').filter(part => part);
       

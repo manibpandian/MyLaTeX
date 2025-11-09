@@ -46,6 +46,9 @@ const initializeMonaco = () => {
           wordWrap: 'on'
         });
         
+        // Make editor globally available
+        window.monacoEditor = monacoEditor;
+        
         // Register LaTeX language after editor is created
         setTimeout(() => {
           try {

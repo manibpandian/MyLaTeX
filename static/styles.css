@@ -385,6 +385,24 @@ body {
   background-color: #374151;
 }
 
+.node-content.active-file {
+  background-color: #1e40af;
+  border-left: 3px solid #3b82f6;
+}
+
+.node-content.active-file:hover {
+  background-color: #1e3a8a;
+}
+
+.node-content.active-folder {
+  background-color: #1e3a5a;
+  border-left: 3px solid #60a5fa;
+}
+
+.node-content.active-folder:hover {
+  background-color: #1e4976;
+}
+
 .chevron-container {
   display: flex;
   align-items: center;
@@ -470,6 +488,38 @@ body {
 
 .action-btn:hover.file-action {
   background-color: #d1fae5;
+}
+
+.action-btn:hover.save-action {
+  background-color: #15803d;
+}
+
+.save-action {
+  background-color: #0891b2;
+  font-size: 14px;
+}
+
+.save-action:hover:not(:disabled) {
+  background-color: #0e7490;
+}
+
+.save-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.compile-action {
+  background-color: #7c3aed;
+  font-size: 14px;
+}
+
+.compile-action:hover:not(:disabled) {
+  background-color: #6d28d9;
+}
+
+.compile-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .action-btn:hover.delete-action {
@@ -576,11 +626,11 @@ body {
 
 .right-pane {
   flex: 1;
-  background-color: #2d2d30;
   display: flex;
   flex-direction: column;
-  min-width: 200px;
   overflow: hidden;
+  background: #2d2d30;
+  min-width: 200px;
 }
 
 .content-placeholder {
@@ -604,17 +654,205 @@ body {
   height: 100%;
 }
 
+/* PDF Toolbar */
+.pdf-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  background-color: rgba(30, 30, 30, 0.3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  backdrop-filter: blur(10px);
+  transition: background-color 0.2s, opacity 0.2s;
+  opacity: 0.5;
+}
+
+.pdf-toolbar:hover {
+  background-color: rgba(30, 30, 30, 0.8);
+  opacity: 1;
+}
+
+.zoom-btn {
+  background-color: rgba(62, 62, 66, 0.6);
+  color: #cccccc;
+  border: 1px solid rgba(85, 85, 85, 0.5);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.zoom-btn:hover {
+  background-color: rgba(80, 80, 80, 0.9);
+}
+
+.zoom-level {
+  color: #cccccc;
+  font-size: 13px;
+  min-width: 50px;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* PDF Placeholder */
+.pdf-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2d2d30;
+  color: #888;
+  font-size: 16px;
+  text-align: center;
+  position: relative;
+}
+
 #pdf-viewer {
+  flex: 1;
   width: 100%;
   height: 100%;
   overflow-y: auto;
   overflow-x: auto;
   background: #2d2d30;
-  padding: 20px;
+  padding: 0;
+  display: none;
+  position: relative;
+}
+
+#pdf-viewer.loaded {
+  display: block;
 }
 
 .pdf-canvas-page {
   display: block;
-  margin: 20px auto;
+  margin: 5px auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.pdf-canvas-page:first-of-type {
+  margin-top: 0px;
+}
+
+.pdf-canvas-page:last-of-type {
+  margin-bottom: 5px;
+}
+
+/* Modern Floating Zoom Toolbar */
+.pdf-zoom-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 1000;
+}
+
+.pdf-zoom-toolbar.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.zoom-control-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 300;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.zoom-control-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.zoom-control-btn:active {
+  transform: scale(0.95);
+}
+
+.zoom-reset {
+  font-size: 20px;
+}
+
+.zoom-display {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 48px;
+  text-align: center;
+  padding: 0 8px;
+  user-select: none;
+}
+
+.zoom-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
+}
+
+/* Tree File Path Display */
+.tree-file-path {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #1e293b;
+  border-top: 1px solid #334155;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: slideUp 0.2s ease-out;
+  z-index: 100;
+}
+
+.file-path-label {
+  font-size: 14px;
+}
+
+.file-path-text {
+  color: #e2e8f0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }

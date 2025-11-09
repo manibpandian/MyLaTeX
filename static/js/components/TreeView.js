@@ -6,6 +6,10 @@ const TreeView = () => {
   const [treeData, setTreeData] = useState([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [editingNodeId, setEditingNodeId] = useState(null);
+  const [activeFilePath, setActiveFilePath] = useState(null);
+  const [showFilePath, setShowFilePath] = useState(false);
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const { addNotification, status } = useNotifications();
   
@@ -280,6 +284,116 @@ const TreeView = () => {
   const handleDisconnect = () => {
     const newTree = disconnectDirectory();
     setTreeData(newTree);
+    setActiveFilePath(null);
+  };
+
+  const handleFileSelect = async (filePath) => {
+    try {
+      const fileData = await readFileContent(filePath);
+      setActiveFilePath(filePath);
+      setShowFilePath(true);
+      
+      // Auto-hide file path display after 3 seconds (but keep highlight)
+      setTimeout(() => {
+        setShowFilePath(false);
+      }, 3000);
+      
+      return fileData;
+    } catch (error) {
+      console.error('Error loading file:', error);
+      throw error;
+    }
+  };
+
+  const saveFile = async () => {
+    if (!activeFilePath) {
+      addNotification('No file is currently open', 'error');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Get content from Monaco editor
+      const content = window.monacoEditor ? window.monacoEditor.getValue() : '';
+      
+      const response = await fetch('/api/documents/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          path: activeFilePath,
+          content: content
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to save file');
+      }
+
+      addNotification('File saved successfully', 'success');
+    } catch (error) {
+      console.error('Save error:', error);
+      addNotification(`Failed to save: ${error.message}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const compileLatex = async () => {
+    if (!activeFilePath || !activeFilePath.endsWith('.tex')) {
+      addNotification('Please select a .tex file to compile', 'error');
+      return;
+    }
+
+    setIsCompiling(true);
+    try {
+      // Save the file first to ensure latest changes are compiled
+      const content = window.monacoEditor ? window.monacoEditor.getValue() : '';
+      
+      const saveResponse = await fetch('/api/documents/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          path: activeFilePath,
+          content: content
+        })
+      });
+
+      const saveData = await saveResponse.json();
+      if (!saveData.success) {
+        throw new Error(saveData.error || 'Failed to save file before compilation');
+      }
+
+      // Now compile the saved file
+      const response = await fetch(`/api/documents/compile/${activeFilePath}`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        const errorMsg = errorData.error || 'Compilation failed';
+        console.error('LaTeX compilation error:', errorMsg);
+        
+        // Show first line in notification, full error in console
+        const firstLine = errorMsg.split('\n')[0];
+        addNotification(`Compilation failed: ${firstLine}`, 'error');
+        
+        // Log full error to console for debugging
+        console.error('Full LaTeX error:\n', errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      const pdfBlob = await response.blob();
+      if (window.loadPDF) {
+        await window.loadPDF(pdfBlob);
+        addNotification('PDF compiled successfully', 'success');
+      }
+    } catch (error) {
+      console.error('Compilation error:', error);
+      // Error already shown in notification above
+    } finally {
+      setIsCompiling(false);
+    }
   };
 
   if (isLoading) {
@@ -318,7 +432,19 @@ const TreeView = () => {
               onClick: () => addFile(''),
               className: "action-btn file-action", 
               title: "Add file"
-            }, React.createElement(Icons.FilePlus, { className: "icon-small icon-green" }))
+            }, React.createElement(Icons.FilePlus, { className: "icon-small icon-green" })),
+            activeFilePath && React.createElement("button", {
+              onClick: saveFile,
+              className: "action-btn save-action",
+              title: "Save File",
+              disabled: isSaving
+            }, isSaving ? '⏳' : '💾'),
+            activeFilePath && activeFilePath.endsWith('.tex') && React.createElement("button", {
+              onClick: compileLatex,
+              className: "action-btn compile-action",
+              title: "Compile LaTeX",
+              disabled: isCompiling
+            }, isCompiling ? '⏳' : '▶️')
           )
         )
       ),
@@ -334,7 +460,7 @@ const TreeView = () => {
                 React.createElement("button", {
                   onClick: handleLoadDirectory,
                   className: "empty-connect-btn"
-                }, "Connect Directory")
+                }, "Load Documents")
               )
             : (window.TreeNode ? treeData.map((node) =>
                 React.createElement(window.TreeNode, {
@@ -348,13 +474,20 @@ const TreeView = () => {
                   setEditingNodeId: setEditingNodeId,
                   moveToTrash: moveToTrash,
                   restoreFromTrash: handleRestoreFromTrash,
-                  onFileSelect: readFileContent
+                  onFileSelect: handleFileSelect,
+                  activeFilePath: activeFilePath
                 })
               ) : React.createElement('div', { className: 'loading-tree' }, 'Loading tree components...'))
         ),
             status.visible && React.createElement('div', {
               className: `tree-status tree-status-${status.type}`
-            }, status.message)
+            }, status.message),
+            showFilePath && activeFilePath && React.createElement('div', {
+              className: 'tree-file-path'
+            }, 
+              React.createElement('span', { className: 'file-path-label' }, '📄 '),
+              React.createElement('span', { className: 'file-path-text' }, activeFilePath)
+            )
       )
     ),
     React.createElement("div", { className: "main-content" },
@@ -362,8 +495,34 @@ const TreeView = () => {
         React.createElement("div", { id: "monaco-editor", style: { width: '100%', height: '100%' } })
       ),
       React.createElement("div", { className: "vertical-splitter", id: "vertical-splitter" }),
-      React.createElement("div", { className: "right-pane" },
-        React.createElement("div", { id: "pdf-viewer", style: { width: '100%', height: '100%', overflow: 'auto', background: '#2d2d30' } })
+      React.createElement("div", { className: "right-pane", id: "pdf-pane" },
+        React.createElement("div", { 
+          id: "pdf-placeholder",
+          className: "pdf-placeholder"
+        }, '👈 Compile a LaTeX file to view PDF'),
+        React.createElement("div", { 
+          id: "pdf-viewer"
+        },
+          React.createElement("div", { className: "pdf-zoom-toolbar" },
+            React.createElement("button", { 
+              onClick: () => window.zoomOut && window.zoomOut(),
+              className: "zoom-control-btn",
+              title: "Zoom Out"
+            }, '−'),
+            React.createElement("span", { id: "zoom-level", className: "zoom-display" }, '150%'),
+            React.createElement("button", { 
+              onClick: () => window.zoomIn && window.zoomIn(),
+              className: "zoom-control-btn",
+              title: "Zoom In"
+            }, '+'),
+            React.createElement("div", { className: "zoom-divider" }),
+            React.createElement("button", { 
+              onClick: () => window.zoomReset && window.zoomReset(),
+              className: "zoom-control-btn zoom-reset",
+              title: "Reset Zoom (150%)"
+            }, '⟲')
+          )
+        )
       )
     )
   );

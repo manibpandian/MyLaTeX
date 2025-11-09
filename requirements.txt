@@ -1,0 +1,9 @@
+# Core dependencies
+flask>=2.3.0
+werkzeug>=2.3.0
+
+# Development tools
+python-dotenv>=1.0.0
+
+# Testing (optional)
+pytest>=7.4.0

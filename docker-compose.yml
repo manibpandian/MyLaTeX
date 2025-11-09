@@ -1,0 +1,23 @@
+services:
+  tree-editor:
+    build: .
+    container_name: MyLaTeX
+    ports:
+      - "8081:5000"
+    volumes:
+      # Mount static files for development (optional)
+      - ./static:/app/static
+      # Mount documents directory for persistent storage
+      - ./documents:/app/documents
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=5000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

@@ -1,6 +1,6 @@
 const { useState, useContext, useEffect } = React;
 
-const TreeNode = ({ node, level = 0, onDelete, onAddFolder, onAddFile, onRename, editingNodeId, setEditingNodeId, moveToTrash, restoreFromTrash, onFileSelect }) => {
+const TreeNode = ({ node, level = 0, onDelete, onAddFolder, onAddFile, onRename, editingNodeId, setEditingNodeId, moveToTrash, restoreFromTrash, onFileSelect, activeFilePath }) => {
   console.log('TreeNode rendered:', node.name, 'isFolder:', node.children !== undefined, 'onFileSelect:', !!onFileSelect);
   
   const { openNodes, toggleNode } = useContext(TreeContext);
@@ -12,7 +12,7 @@ const TreeNode = ({ node, level = 0, onDelete, onAddFolder, onAddFile, onRename,
   const isFolder = node.children !== undefined;
   
   // Check if this item is inside the .trash folder
-  const isInTrash = node.id.includes('/.trash/') && node.name !== '.trash';
+  const isInTrash = (node.id.includes('/.trash/') || node.id.startsWith('.trash/')) && node.name !== '.trash';
   const isTrashFolder = node.name === '.trash';
 
   // Handle when this node should enter edit mode
@@ -76,17 +76,28 @@ const TreeNode = ({ node, level = 0, onDelete, onAddFolder, onAddFile, onRename,
     // Only handle file clicks, not folder clicks
     if (!isFolder && onFileSelect) {
       try {
-        console.log('Reading file with ID:', node.id);
+        console.log('[TreeNode] Reading file with ID:', node.id);
         const fileData = await onFileSelect(node.id);
-        console.log('File data received:', fileData);
-        if (window.updateMonacoContent) {
-          console.log('Updating Monaco editor');
-          window.updateMonacoContent(fileData.content, fileData.fileName);
-        } else {
-          console.error('window.updateMonacoContent not available');
+        console.log('[TreeNode] File data received:', fileData);
+        
+        if (!window.updateMonacoContent) {
+          console.error('[TreeNode] window.updateMonacoContent not available!');
+          alert('Editor not initialized. Please refresh the page.');
+          return;
         }
+        
+        if (!window.monacoEditor) {
+          console.error('[TreeNode] window.monacoEditor not available!');
+          alert('Monaco editor not ready. Please refresh the page.');
+          return;
+        }
+        
+        console.log('[TreeNode] Updating Monaco editor with content');
+        window.updateMonacoContent(fileData.content, fileData.fileName);
+        console.log('[TreeNode] Monaco editor updated successfully');
       } catch (error) {
-        console.error('Error loading file:', error);
+        console.error('[TreeNode] Error loading file:', error);
+        alert('Failed to load file: ' + error.message);
       }
     } else {
       console.log('Skipping click - isFolder:', isFolder, 'onFileSelect available:', !!onFileSelect);
@@ -97,9 +108,12 @@ const TreeNode = ({ node, level = 0, onDelete, onAddFolder, onAddFile, onRename,
     console.log('=== TEST CLICK WORKING ===', node.name);
   };
 
+  const isActive = !isFolder && activeFilePath === node.id;
+  const isActiveFolder = isFolder && activeFilePath && activeFilePath.startsWith(node.id + '/');
+
   return React.createElement("div", { className: "tree-node" },
     React.createElement("div", {
-      className: "node-content",
+      className: `node-content ${isActive ? 'active-file' : ''} ${isActiveFolder ? 'active-folder' : ''}`,
       style: { paddingLeft: `${level * 20 + 8}px` },
       onMouseEnter: () => setShowActions(true),
       onMouseLeave: () => setShowActions(false)
@@ -165,7 +179,8 @@ const TreeNode = ({ node, level = 0, onDelete, onAddFolder, onAddFile, onRename,
           }, React.createElement(Icons.Trash2, { className: "icon-small icon-red" }))
         ] : [
           // Normal buttons for regular items
-          ...(isFolder ? [
+          // Don't show add folder/file buttons for .trash folder or items inside trash
+          ...(isFolder && !isTrashFolder && !isInTrash ? [
             React.createElement("button", {
               key: "folder",
               onClick: async () => {
@@ -214,7 +229,8 @@ const TreeNode = ({ node, level = 0, onDelete, onAddFolder, onAddFile, onRename,
           setEditingNodeId: setEditingNodeId,
           moveToTrash: moveToTrash,
           restoreFromTrash: restoreFromTrash,
-          onFileSelect: onFileSelect
+          onFileSelect: onFileSelect,
+          activeFilePath: activeFilePath
         })
       )
     )
