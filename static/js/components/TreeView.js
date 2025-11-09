@@ -1,4 +1,4 @@
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 const TreeView = () => {
   const [openNodes, setOpenNodes] = useState({});
@@ -12,6 +12,8 @@ const TreeView = () => {
   const [isCompiling, setIsCompiling] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [sidebarCloseTimeout, setSidebarCloseTimeout] = useState(null);
+  const [autoCompile, setAutoCompile] = useState(true); // Auto-compile on save
+  const autoCompileRef = useRef(true); // Ref to track current value immediately
   
   const { addNotification, status } = useNotifications();
   
@@ -30,7 +32,41 @@ const TreeView = () => {
     readFileContent
   } = useFileSystem(addNotification);
 
-    useEffect(() => {
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Cmd/Ctrl + S: Save
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (activeFilePath) {
+          saveFile();
+        }
+      }
+      
+      // Cmd/Ctrl + B: Compile
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        if (activeFilePath && activeFilePath.endsWith('.tex')) {
+          compileLatex();
+        }
+      }
+      
+      // Cmd/Ctrl + \: Toggle sidebar
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeFilePath, isSaving, isCompiling]);
+
+  useEffect(() => {
+    handleLoadDirectory();
+  }, []);
+
+  useEffect(() => {
     setTreeData([]);
     setIsLoading(false);
     
@@ -366,15 +402,21 @@ const TreeView = () => {
         })
       });
 
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to save file');
+      if (!response.ok) {
+        throw new Error('Failed to save file');
       }
 
       addNotification('File saved successfully', 'success');
+      
+      // Auto-compile if enabled and file is .tex (but not if already compiling)
+      console.log('Auto-compile check:', { autoCompile: autoCompileRef.current, isTexFile: activeFilePath.endsWith('.tex'), isCompiling });
+      if (autoCompileRef.current && activeFilePath.endsWith('.tex') && !isCompiling) {
+        console.log('Triggering auto-compile');
+        setTimeout(() => compileLatex(), 100);
+      }
     } catch (error) {
-      console.error('Save error:', error);
-      addNotification(`Failed to save: ${error.message}`, 'error');
+      console.error('Error saving file:', error);
+      addNotification(`Failed to save file: ${error.message}`, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -387,8 +429,17 @@ const TreeView = () => {
     }
 
     setIsCompiling(true);
+    
+    // Clear previous error markers
+    if (window.monacoEditor && window.monaco) {
+      const model = window.monacoEditor.getModel();
+      if (model) {
+        window.monaco.editor.setModelMarkers(model, 'latex', []);
+      }
+    }
+    
     try {
-      // Save the file first to ensure latest changes are compiled
+      // Save file content directly without triggering auto-compile
       const content = window.monacoEditor ? window.monacoEditor.getValue() : '';
       
       const saveResponse = await fetch('/api/documents/write', {
@@ -400,31 +451,50 @@ const TreeView = () => {
         })
       });
 
-      const saveData = await saveResponse.json();
-      if (!saveData.success) {
-        throw new Error(saveData.error || 'Failed to save file before compilation');
+      if (!saveResponse.ok) {
+        throw new Error('Failed to save file before compilation');
       }
 
-      // Now compile the saved file
       const response = await fetch(`/api/documents/compile/${activeFilePath}`, {
         method: 'POST'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        const errorMsg = errorData.error || 'Compilation failed';
-        console.error('LaTeX compilation error:', errorMsg);
         
-        // Show first line in notification, full error in console
-        const firstLine = errorMsg.split('\n')[0];
-        addNotification(`Compilation failed: ${firstLine}`, 'error');
+        // Parse LaTeX errors and highlight in editor
+        if (errorData.error && window.monacoEditor && window.monaco) {
+          const errorText = errorData.error;
+          const lineMatch = errorText.match(/l\.(\d+)/); // Match "l.123" pattern
+          
+          if (lineMatch) {
+            const lineNumber = parseInt(lineMatch[1]);
+            const model = window.monacoEditor.getModel();
+            
+            if (model) {
+              const markers = [{
+                severity: window.monaco.MarkerSeverity.Error,
+                startLineNumber: lineNumber,
+                startColumn: 1,
+                endLineNumber: lineNumber,
+                endColumn: model.getLineMaxColumn(lineNumber),
+                message: errorText.split('\n')[0]
+              }];
+              
+              window.monaco.editor.setModelMarkers(model, 'latex', markers);
+              
+              // Scroll to error line
+              window.monacoEditor.revealLineInCenter(lineNumber);
+            }
+          }
+        }
         
-        // Log full error to console for debugging
-        console.error('Full LaTeX error:\n', errorMsg);
-        throw new Error(errorMsg);
+        throw new Error(errorData.error || 'Compilation failed');
       }
 
       const pdfBlob = await response.blob();
+      
+      // Load PDF using the pdfRenderer
       if (window.loadPDF) {
         await window.loadPDF(pdfBlob);
         addNotification('PDF compiled successfully', 'success');
@@ -526,21 +596,43 @@ const TreeView = () => {
     React.createElement("div", { className: "main-content" },
       React.createElement("div", { className: "left-pane", id: "editor-pane" },
         React.createElement("div", { id: "monaco-editor", style: { width: '100%', height: '100%' } }),
-        activeFilePath && React.createElement("div", { className: "editor-toolbar" },
-          React.createElement("button", { 
-            onClick: saveFile,
-            className: "editor-control-btn editor-save",
-            title: "Save File (Cmd/Ctrl+S)",
-            disabled: isSaving
-          }, isSaving ? '⧖' : '✓'),
-          activeFilePath.endsWith('.tex') && React.createElement("div", { className: "editor-divider" }),
-          activeFilePath.endsWith('.tex') && React.createElement("button", { 
-            onClick: compileLatex,
-            className: "editor-control-btn editor-compile",
-            title: "Compile LaTeX",
-            disabled: isCompiling
-          }, isCompiling ? '⧖' : '▶')
-        )
+          activeFilePath && React.createElement("div", { className: "editor-toolbar" },
+            React.createElement("div", { className: "toolbar-btn-group" },
+              React.createElement("button", { 
+                onClick: saveFile,
+                className: "editor-control-btn editor-save",
+                disabled: isSaving
+              }, 
+                isSaving ? '⧖' : '✓',
+                React.createElement("span", { className: "btn-label" }, "Save")
+              ),
+              activeFilePath.endsWith('.tex') && React.createElement("button", { 
+                onClick: compileLatex,
+                className: "editor-control-btn editor-compile",
+                disabled: isCompiling
+              }, 
+                isCompiling ? '⧖' : '▶',
+                React.createElement("span", { className: "btn-label" }, "Compile")
+              )
+            ),
+            activeFilePath.endsWith('.tex') && React.createElement("div", { className: "editor-divider" }),
+            activeFilePath.endsWith('.tex') && React.createElement("div", { className: "auto-compile-toggle" },
+              React.createElement("label", { className: "toggle-switch" },
+                React.createElement("input", { 
+                  type: "checkbox",
+                  checked: autoCompile,
+                  onChange: (e) => {
+                    const newValue = e.target.checked;
+                    console.log('Toggle changed to:', newValue);
+                    autoCompileRef.current = newValue; // Update ref immediately
+                    setAutoCompile(newValue);
+                  }
+                }),
+                React.createElement("span", { className: "toggle-slider" }),
+                React.createElement("span", { className: "toggle-label" }, "Auto")
+              )
+            )
+          )
       ),
       React.createElement("div", { className: "vertical-splitter", id: "vertical-splitter" }),
       React.createElement("div", { className: "right-pane", id: "pdf-pane" },

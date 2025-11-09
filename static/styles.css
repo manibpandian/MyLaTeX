@@ -872,7 +872,7 @@ body {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(12px);
@@ -889,21 +889,46 @@ body {
   pointer-events: all;
 }
 
+.toolbar-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .editor-control-btn {
-  width: 36px;
+  min-width: 36px;
   height: 36px;
   border: none;
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  border-radius: 50%;
+  border-radius: 18px;
   font-size: 20px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
-  padding: 0;
+  gap: 6px;
+  transition: all 0.3s ease;
+  padding: 0 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-label {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 0;
+  opacity: 0;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.editor-control-btn:hover .btn-label {
+  max-width: 100px;
+  opacity: 1;
+  margin-left: 2px;
 }
 
 .editor-control-btn:hover:not(:disabled) {
@@ -921,13 +946,13 @@ body {
 }
 
 .editor-save {
-  background: rgba(16, 185, 129, 0.3);
-  color: #10b981;
+  background: rgba(52, 211, 153, 0.3);
+  color: #34d399;
 }
 
 .editor-save:hover:not(:disabled) {
-  background: rgba(16, 185, 129, 0.5);
-  color: #34d399;
+  background: rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
 }
 
 .editor-compile {
@@ -938,6 +963,63 @@ body {
 .editor-compile:hover:not(:disabled) {
   background: rgba(139, 92, 246, 0.5);
   color: #c4b5fd;
+}
+
+/* Modern Toggle Switch */
+.auto-compile-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.toggle-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 2px;
+  top: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: #60a5fa;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+  white-space: nowrap;
 }
 
 .editor-divider {
