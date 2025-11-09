@@ -4,12 +4,14 @@ const TreeView = () => {
   const [openNodes, setOpenNodes] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [treeData, setTreeData] = useState([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [editingNodeId, setEditingNodeId] = useState(null);
   const [activeFilePath, setActiveFilePath] = useState(null);
+  const [activeFolder, setActiveFolder] = useState(null);
   const [showFilePath, setShowFilePath] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [sidebarCloseTimeout, setSidebarCloseTimeout] = useState(null);
   
   const { addNotification, status } = useNotifications();
   
@@ -46,6 +48,29 @@ const TreeView = () => {
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+    // Clear any pending auto-close timeout
+    if (sidebarCloseTimeout) {
+      clearTimeout(sidebarCloseTimeout);
+      setSidebarCloseTimeout(null);
+    }
+  };
+
+  const handleSidebarMouseEnter = () => {
+    // Clear timeout when mouse enters
+    if (sidebarCloseTimeout) {
+      clearTimeout(sidebarCloseTimeout);
+      setSidebarCloseTimeout(null);
+    }
+  };
+
+  const handleSidebarMouseLeave = () => {
+    // Only auto-close if sidebar is open
+    if (isSidebarOpen) {
+      const timeout = setTimeout(() => {
+        setIsSidebarOpen(false);
+      }, 3000);
+      setSidebarCloseTimeout(timeout);
+    }
   };
 
   // Virtual node operations (for demo mode without filesystem)
@@ -290,7 +315,23 @@ const TreeView = () => {
   const handleFileSelect = async (filePath) => {
     try {
       const fileData = await readFileContent(filePath);
+      
+      // Get folder path (everything before the last /)
+      const folderPath = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : '';
+      
+      // Clear PDF if folder changed
+      if (activeFolder !== null && activeFolder !== folderPath) {
+        const pdfViewer = document.getElementById('pdf-viewer');
+        const pdfPlaceholder = document.getElementById('pdf-placeholder');
+        if (pdfViewer && pdfPlaceholder) {
+          pdfViewer.classList.remove('loaded');
+          pdfViewer.innerHTML = '';
+          pdfPlaceholder.style.display = 'flex';
+        }
+      }
+      
       setActiveFilePath(filePath);
+      setActiveFolder(folderPath);
       setShowFilePath(true);
       
       // Auto-hide file path display after 3 seconds (but keep highlight)
@@ -403,7 +444,11 @@ const TreeView = () => {
   }
 
   return React.createElement("div", { className: "app" },
-    React.createElement("div", { className: `sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}` },
+    React.createElement("div", { 
+      className: `sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`,
+      onMouseEnter: handleSidebarMouseEnter,
+      onMouseLeave: handleSidebarMouseLeave
+    },
       React.createElement("div", { className: "sidebar-header" },
         React.createElement("button", { 
           onClick: toggleSidebar, 
@@ -432,19 +477,7 @@ const TreeView = () => {
               onClick: () => addFile(''),
               className: "action-btn file-action", 
               title: "Add file"
-            }, React.createElement(Icons.FilePlus, { className: "icon-small icon-green" })),
-            activeFilePath && React.createElement("button", {
-              onClick: saveFile,
-              className: "action-btn save-action",
-              title: "Save File",
-              disabled: isSaving
-            }, isSaving ? '⏳' : '💾'),
-            activeFilePath && activeFilePath.endsWith('.tex') && React.createElement("button", {
-              onClick: compileLatex,
-              className: "action-btn compile-action",
-              title: "Compile LaTeX",
-              disabled: isCompiling
-            }, isCompiling ? '⏳' : '▶️')
+            }, React.createElement(Icons.FilePlus, { className: "icon-small icon-green" }))
           )
         )
       ),
@@ -491,8 +524,23 @@ const TreeView = () => {
       )
     ),
     React.createElement("div", { className: "main-content" },
-      React.createElement("div", { className: "left-pane" },
-        React.createElement("div", { id: "monaco-editor", style: { width: '100%', height: '100%' } })
+      React.createElement("div", { className: "left-pane", id: "editor-pane" },
+        React.createElement("div", { id: "monaco-editor", style: { width: '100%', height: '100%' } }),
+        activeFilePath && React.createElement("div", { className: "editor-toolbar" },
+          React.createElement("button", { 
+            onClick: saveFile,
+            className: "editor-control-btn editor-save",
+            title: "Save File (Cmd/Ctrl+S)",
+            disabled: isSaving
+          }, isSaving ? '⧖' : '✓'),
+          activeFilePath.endsWith('.tex') && React.createElement("div", { className: "editor-divider" }),
+          activeFilePath.endsWith('.tex') && React.createElement("button", { 
+            onClick: compileLatex,
+            className: "editor-control-btn editor-compile",
+            title: "Compile LaTeX",
+            disabled: isCompiling
+          }, isCompiling ? '⧖' : '▶')
+        )
       ),
       React.createElement("div", { className: "vertical-splitter", id: "vertical-splitter" }),
       React.createElement("div", { className: "right-pane", id: "pdf-pane" },

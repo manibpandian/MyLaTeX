@@ -320,6 +320,29 @@ body {
   background-color: #1f2937;
 }
 
+/* Thin minimal scrollbar (from example) */
+.tree-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tree-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tree-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.tree-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.tree-container {
+  scrollbar-width: thin;
+  scrollbar-color: #888 transparent;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -605,23 +628,35 @@ body {
   width: 50%;
   min-width: 200px;
   overflow: hidden;
+  position: relative;
 }
 
 .vertical-splitter {
-  width: 4px;
-  background: #3e3e42;
+  width: 1px;
+  background: #3a3a3a;
   cursor: col-resize;
   user-select: none;
-  transition: background 0.2s ease;
+  transition: background 0.15s ease;
   flex-shrink: 0;
+  position: relative;
+}
+
+.vertical-splitter::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -4px;
+  right: -4px;
+  bottom: 0;
+  background: transparent;
 }
 
 .vertical-splitter:hover {
-  background: #0e639c;
+  background: #4a4a4a;
 }
 
 .vertical-splitter.active {
-  background: #0e639c;
+  background: #5a9fd4;
 }
 
 .right-pane {
@@ -809,6 +844,89 @@ body {
 }
 
 .zoom-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
+}
+
+/* Modern Floating Editor Toolbar */
+.editor-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 1000;
+}
+
+.editor-toolbar.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.editor-control-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.editor-control-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.15);
+}
+
+.editor-control-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.editor-control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editor-save {
+  background: rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.editor-save:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.5);
+  color: #34d399;
+}
+
+.editor-compile {
+  background: rgba(139, 92, 246, 0.3);
+  color: #a78bfa;
+}
+
+.editor-compile:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.5);
+  color: #c4b5fd;
+}
+
+.editor-divider {
   width: 1px;
   height: 20px;
   background: rgba(255, 255, 255, 0.2);

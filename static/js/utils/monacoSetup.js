@@ -127,3 +127,51 @@ const updateMonacoContent = (content, fileName) => {
 // Make functions globally available
 window.updateMonacoContent = updateMonacoContent;
 window.initializeMonacoEditor = initializeMonaco;
+
+// Setup editor toolbar auto-hide
+let editorToolbarHideTimeout = null;
+
+const setupEditorToolbarAutoHide = () => {
+  const editorPane = document.getElementById('editor-pane');
+  const toolbar = editorPane?.querySelector('.editor-toolbar');
+  
+  if (!editorPane || !toolbar) {
+    setTimeout(setupEditorToolbarAutoHide, 500);
+    return;
+  }
+  
+  const showToolbar = () => {
+    toolbar.classList.add('visible');
+    
+    if (editorToolbarHideTimeout) {
+      clearTimeout(editorToolbarHideTimeout);
+    }
+    
+    editorToolbarHideTimeout = setTimeout(() => {
+      toolbar.classList.remove('visible');
+    }, 2000);
+  };
+  
+  editorPane.addEventListener('mousemove', showToolbar);
+  
+  toolbar.addEventListener('mouseenter', () => {
+    if (editorToolbarHideTimeout) {
+      clearTimeout(editorToolbarHideTimeout);
+    }
+    toolbar.classList.add('visible');
+  });
+  
+  toolbar.addEventListener('mouseleave', () => {
+    editorToolbarHideTimeout = setTimeout(() => {
+      toolbar.classList.remove('visible');
+    }, 2000);
+  });
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupEditorToolbarAutoHide);
+} else {
+  setupEditorToolbarAutoHide();
+}
+
+window.setupEditorToolbarAutoHide = setupEditorToolbarAutoHide;
