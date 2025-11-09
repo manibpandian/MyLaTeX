@@ -68,7 +68,7 @@ const TreeView = () => {
     if (isSidebarOpen) {
       const timeout = setTimeout(() => {
         setIsSidebarOpen(false);
-      }, 3000);
+      }, 500);
       setSidebarCloseTimeout(timeout);
     }
   };
