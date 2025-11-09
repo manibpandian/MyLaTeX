@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     texlive-fonts-extra \
     curl \
     git \
+    rsync \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -30,9 +31,14 @@ RUN pip3 install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
+# Create directories for sync
+RUN mkdir -p /sync-repo
+
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+
+# Keep as root for git operations (sync daemon needs it)
+# USER appuser
 
 # Expose port
 EXPOSE 5000
