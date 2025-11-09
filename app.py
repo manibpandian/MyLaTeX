@@ -270,24 +270,48 @@ def compile_latex(filepath):
         if not filepath.endswith('.tex'):
             return jsonify({'success': False, 'error': 'Not a LaTeX file'}), 400
         
+        # Check if force recompile is requested
+        force_compile = request.args.get('force', 'false').lower() == 'true'
+        
+        # Setup cache directory
+        file_dir = os.path.dirname(full_path)
+        file_name = os.path.basename(full_path)
+        cache_dir = os.path.join(file_dir, '.latex_cache')
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        cached_pdf = os.path.join(cache_dir, file_name.replace('.tex', '.pdf'))
+        
+        # Check cache if not forcing recompile
+        if not force_compile and os.path.exists(cached_pdf):
+            tex_mtime = os.path.getmtime(full_path)
+            pdf_mtime = os.path.getmtime(cached_pdf)
+            
+            if pdf_mtime > tex_mtime:
+                print(f"✓ Using cached PDF for {filepath}")
+                return send_file(cached_pdf, mimetype='application/pdf')
+        
         # Read the LaTeX content
         with open(full_path, 'r', encoding='utf-8') as f:
             tex_content = f.read()
         
-        # Create a temporary directory for compilation
-        temp_dir = tempfile.mkdtemp()
-        latex_file = os.path.join(temp_dir, 'main.tex')
-        pdf_file = os.path.join(temp_dir, 'main.pdf')
+        # Use cache directory for compilation
+        latex_file = os.path.join(cache_dir, 'main.tex')
+        pdf_file = os.path.join(cache_dir, 'main.pdf')  # pdflatex always outputs main.pdf
         
         # Write LaTeX content to temp file
         with open(latex_file, 'w', encoding='utf-8') as f:
             f.write(tex_content)
         
         # Compile LaTeX (run twice for references)
+        if force_compile:
+            print(f"⚙ Force compiling {filepath}...")
+        else:
+            print(f"⚙ Compiling {filepath}...")
+        
         for _ in range(2):
             result = subprocess.run(
                 ['pdflatex', '-shell-escape', '-interaction=nonstopmode', 
-                 '-halt-on-error', '-output-directory', temp_dir, latex_file],
+                 '-halt-on-error', '-output-directory', cache_dir, latex_file],
                 capture_output=True,
                 text=True,
                 timeout=30
@@ -295,7 +319,7 @@ def compile_latex(filepath):
         
         # Check if PDF was created
         if not os.path.exists(pdf_file):
-            log_file = os.path.join(temp_dir, 'main.log')
+            log_file = os.path.join(cache_dir, 'main.log')
             error_msg = "Compilation failed. No PDF generated."
             error_details = []
             
@@ -322,26 +346,16 @@ def compile_latex(filepath):
                         # Fallback: show last 20 lines of log
                         error_msg = '\n'.join(lines[-20:])
             
-            shutil.rmtree(temp_dir, ignore_errors=True)
             return jsonify({'success': False, 'error': error_msg}), 500
         
-        # Read PDF file into memory
-        with open(pdf_file, 'rb') as f:
-            pdf_data = f.read()
+        # Rename main.pdf to the cached filename
+        if pdf_file != cached_pdf:
+            shutil.move(pdf_file, cached_pdf)
         
-        # Clean up temp directory
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        
-        # Send PDF from memory
-        return send_file(
-            BytesIO(pdf_data),
-            mimetype='application/pdf',
-            as_attachment=False,
-            download_name='output.pdf'
-        )
+        print(f"✓ Compiled and cached PDF at {cached_pdf}")
+        return send_file(cached_pdf, mimetype='application/pdf')
         
     except subprocess.TimeoutExpired:
-        shutil.rmtree(temp_dir, ignore_errors=True)
         return jsonify({'success': False, 'error': 'Compilation timed out (took more than 30 seconds)'}), 500
     except FileNotFoundError:
         return jsonify({'success': False, 'error': 'pdflatex not found. Please install TeX Live.'}), 500

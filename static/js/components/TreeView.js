@@ -15,6 +15,9 @@ const TreeView = () => {
   const [autoCompile, setAutoCompile] = useState(true); // Auto-compile on save
   const autoCompileRef = useRef(true); // Ref to track current value immediately
   const autoSaveTimeoutRef = useRef(null); // Auto-save timeout
+  const [useCache, setUseCache] = useState(true); // Use incremental compilation cache
+  const useCacheRef = useRef(true); // Ref to track cache setting immediately
+  const [showHamburger, setShowHamburger] = useState(false); // Control hamburger visibility
   
   const { addNotification, status } = useNotifications();
   
@@ -91,6 +94,18 @@ const TreeView = () => {
       }
     };
   }, [activeFilePath]);
+
+  // Track mouse position for hamburger visibility
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      // Show hamburger if mouse is in top-left corner (120px x 120px) or sidebar is open
+      const inCorner = e.clientX < 120 && e.clientY < 120;
+      setShowHamburger(inCorner || isSidebarOpen);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isSidebarOpen]);
 
   useEffect(() => {
     setTreeData([]);
@@ -481,7 +496,9 @@ const TreeView = () => {
         throw new Error('Failed to save file before compilation');
       }
 
-      const response = await fetch(`/api/documents/compile/${activeFilePath}`, {
+      // Add force parameter if cache is disabled
+      const forceParam = useCacheRef.current ? '' : '?force=true';
+      const response = await fetch(`/api/documents/compile/${activeFilePath}${forceParam}`, {
         method: 'POST'
       });
 
@@ -540,19 +557,19 @@ const TreeView = () => {
   }
 
   return React.createElement("div", { className: "app" },
+    React.createElement("button", { 
+      onClick: toggleSidebar, 
+      className: `hamburger-btn ${showHamburger ? 'visible' : ''}`,
+      title: isSidebarOpen ? 'Close sidebar' : 'Open sidebar'
+    },
+      React.createElement(Icons.Menu, { className: "hamburger-icon" })
+    ),
     React.createElement("div", { 
       className: `sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`,
       onMouseEnter: handleSidebarMouseEnter,
       onMouseLeave: handleSidebarMouseLeave
     },
       React.createElement("div", { className: "sidebar-header" },
-        React.createElement("button", { 
-          onClick: toggleSidebar, 
-          className: "hamburger-btn",
-          title: isSidebarOpen ? 'Close sidebar' : 'Open sidebar'
-        },
-          React.createElement(Icons.Menu, { className: "hamburger-icon" })
-        ),
         isSidebarOpen && React.createElement("div", { className: "sidebar-controls" },
           React.createElement("h2", { className: "sidebar-title" }, "Nool"),
           React.createElement("div", { className: "connection-status" },
@@ -649,13 +666,29 @@ const TreeView = () => {
                   checked: autoCompile,
                   onChange: (e) => {
                     const newValue = e.target.checked;
-                    console.log('Toggle changed to:', newValue);
-                    autoCompileRef.current = newValue; // Update ref immediately
+                    console.log('Auto-compile toggle:', newValue);
+                    autoCompileRef.current = newValue;
                     setAutoCompile(newValue);
                   }
                 }),
                 React.createElement("span", { className: "toggle-slider" }),
                 React.createElement("span", { className: "toggle-label" }, "Auto")
+              )
+            ),
+            activeFilePath.endsWith('.tex') && React.createElement("div", { className: "auto-compile-toggle" },
+              React.createElement("label", { className: "toggle-switch" },
+                React.createElement("input", { 
+                  type: "checkbox",
+                  checked: useCache,
+                  onChange: (e) => {
+                    const newValue = e.target.checked;
+                    console.log('Cache toggle:', newValue);
+                    useCacheRef.current = newValue;
+                    setUseCache(newValue);
+                  }
+                }),
+                React.createElement("span", { className: "toggle-slider" }),
+                React.createElement("span", { className: "toggle-label" }, "Cache")
               )
             )
           )
