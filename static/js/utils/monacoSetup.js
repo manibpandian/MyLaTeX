@@ -35,16 +35,11 @@ const initializeMonaco = () => {
     
     require(['vs/editor/editor.main'], function () {
       try {
-        // Register custom themes if available
-        if (window.MonacoThemeManager) {
-          window.MonacoThemeManager.registerAllThemes();
-        }
-        
-        // Create Monaco editor with elegant theme
+        // Create Monaco editor with vs-dark theme
         monacoEditor = monaco.editor.create(container, {
           value: '% Select a file to edit\n',
           language: 'plaintext',
-          theme: window.MonacoThemeManager ? 'elegantLatex' : 'vs-dark',
+          theme: 'vs-dark',
           automaticLayout: true,
           fontSize: 14,
           minimap: { enabled: false },
@@ -56,14 +51,6 @@ const initializeMonaco = () => {
           cursorBlinking: 'smooth',
           cursorSmoothCaretAnimation: true
         });
-        
-        // Ensure theme is applied after creation
-        setTimeout(() => {
-          if (window.MonacoThemeManager) {
-            window.MonacoThemeManager.applyTheme('elegantLatex');
-            console.log('✓ Applied elegantLatex theme');
-          }
-        }, 100);
         
         // Make editor globally available
         window.monacoEditor = monacoEditor;
