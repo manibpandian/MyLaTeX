@@ -35,16 +35,35 @@ const initializeMonaco = () => {
     
     require(['vs/editor/editor.main'], function () {
       try {
-        // Create Monaco editor with minimal configuration first
+        // Register custom themes if available
+        if (window.MonacoThemeManager) {
+          window.MonacoThemeManager.registerAllThemes();
+        }
+        
+        // Create Monaco editor with elegant theme
         monacoEditor = monaco.editor.create(container, {
           value: '% Select a file to edit\n',
           language: 'plaintext',
-          theme: 'vs-dark',
+          theme: window.MonacoThemeManager ? 'elegantLatex' : 'vs-dark',
           automaticLayout: true,
           fontSize: 14,
           minimap: { enabled: false },
-          wordWrap: 'on'
+          wordWrap: 'on',
+          fontFamily: "'Monaco', 'Menlo', 'Ubuntu Mono', monospace",
+          lineHeight: 22,
+          letterSpacing: 0.5,
+          smoothScrolling: true,
+          cursorBlinking: 'smooth',
+          cursorSmoothCaretAnimation: true
         });
+        
+        // Ensure theme is applied after creation
+        setTimeout(() => {
+          if (window.MonacoThemeManager) {
+            window.MonacoThemeManager.applyTheme('elegantLatex');
+            console.log('✓ Applied elegantLatex theme');
+          }
+        }, 100);
         
         // Make editor globally available
         window.monacoEditor = monacoEditor;
@@ -52,20 +71,71 @@ const initializeMonaco = () => {
         // Register LaTeX language after editor is created
         setTimeout(() => {
           try {
-            if (!monaco.languages.getLanguages().find(l => l.id === 'latex')) {
+            // Always re-register to ensure latest tokenizer
+            const existingLang = monaco.languages.getLanguages().find(l => l.id === 'latex');
+            if (!existingLang) {
               monaco.languages.register({ id: 'latex' });
-              monaco.languages.setMonarchTokensProvider('latex', {
+              console.log('✓ Registered LaTeX language');
+            } else {
+              console.log('LaTeX language already registered, updating tokenizer...');
+            }
+            
+            // Set/update the tokenizer (this will override any existing one)
+            monaco.languages.setMonarchTokensProvider('latex', {
                 tokenizer: {
                   root: [
+                    // Comments (highest priority)
                     [/%.*$/, 'comment'],
-                    [/\\\\(documentclass|usepackage|begin|end|section|subsection|chapter|title|author|date)/, 'keyword'],
-                    [/\\\\[a-zA-Z]+/, 'function'],
-                    [/\{|\}/, 'delimiter'],
-                    [/\$\$[\s\S]*?\$\$|\$[^\$]*\$/, 'string']
+                    
+                    // Math delimiters (before other commands)
+                    [/\$\$/, 'keyword.math'],
+                    [/\$/, 'keyword.math'],
+                    [/\\\[/, 'keyword.math'],
+                    [/\\\]/, 'keyword.math'],
+                    [/\\\(/, 'keyword.math'],
+                    [/\\\)/, 'keyword.math'],
+                    
+                    // Sectioning commands with asterisk (must come before generic commands)
+                    [/\\(part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\*/, 'keyword'],
+                    [/\\(part|chapter|section|subsection|subsubsection|paragraph|subparagraph)(?![a-zA-Z])/, 'keyword'],
+                    
+                    // Special commands
+                    [/\\(documentclass|usepackage|newcommand|renewcommand|input|include)(?![a-zA-Z])/, 'keyword.control'],
+                    
+                    // Environments
+                    [/\\(begin|end)(?![a-zA-Z])/, 'keyword', '@environment'],
+                    
+                    // Text formatting
+                    [/\\(textbf|textit|texttt|emph|underline|textsc)(?![a-zA-Z])/, 'type'],
+                    
+                    // Labels and references
+                    [/\\(label|ref|eqref|cite|bibliography|bibliographystyle)(?![a-zA-Z])/, 'tag'],
+                    
+                    // Generic commands with optional asterisk (lowest priority for commands)
+                    [/\\[a-zA-Z]+\*/, 'function'],
+                    [/\\[a-zA-Z]+/, 'function'],
+                    
+                    // Braces
+                    [/[{}]/, 'delimiter.curly'],
+                    [/[\[\]]/, 'delimiter.square'],
+                    
+                    // Numbers
+                    [/\d+/, 'number'],
+                  ],
+                  
+                  // Environment state - to colorize environment names
+                  environment: [
+                    [/\{/, 'delimiter.curly', '@environmentName'],
+                    [/./, '', '@pop']
+                  ],
+                  
+                  environmentName: [
+                    [/[a-zA-Z*]+/, 'type.identifier'],
+                    [/\}/, 'delimiter.curly', '@pop'],
                   ]
                 }
               });
-            }
+              console.log('✓ LaTeX tokenizer registered with enhanced syntax');
           } catch (langError) {
             console.warn('Could not register LaTeX language:', langError);
           }
@@ -128,9 +198,8 @@ const updateMonacoContent = (content, fileName) => {
 window.updateMonacoContent = updateMonacoContent;
 window.initializeMonacoEditor = initializeMonaco;
 
-// Setup editor toolbar auto-hide
+// Setup editor toolbar - instant show on hover, larger trigger area
 let editorToolbarHideTimeout = null;
-let editorToolbarShowTimeout = null;
 
 const setupEditorToolbarAutoHide = () => {
   const editorPane = document.getElementById('editor-pane');
@@ -142,46 +211,37 @@ const setupEditorToolbarAutoHide = () => {
   }
   
   const showToolbar = (e) => {
-    // Only show if mouse is in top 100px of editor pane
     const rect = editorPane.getBoundingClientRect();
     const mouseY = e.clientY - rect.top;
     
-    if (mouseY > 100) {
-      return; // Don't show if mouse is not near top
-    }
-    
-    // Clear any pending show timeout
-    if (editorToolbarShowTimeout) {
-      clearTimeout(editorToolbarShowTimeout);
-    }
-    
-    // Delay showing by 500ms to avoid accidental triggers
-    editorToolbarShowTimeout = setTimeout(() => {
-      toolbar.classList.add('visible');
-      
+    // Show instantly when mouse is in top 200px (larger area)
+    if (mouseY < 200) {
       if (editorToolbarHideTimeout) {
         clearTimeout(editorToolbarHideTimeout);
       }
-      
-      // Hide after 1 second of inactivity
+      toolbar.classList.add('visible');
+    } else {
+      // Hide after 2 seconds when mouse moves away (longer delay)
+      if (editorToolbarHideTimeout) {
+        clearTimeout(editorToolbarHideTimeout);
+      }
       editorToolbarHideTimeout = setTimeout(() => {
         toolbar.classList.remove('visible');
-      }, 1000);
-    }, 500);
+      }, 2000);
+    }
   };
   
   editorPane.addEventListener('mousemove', showToolbar);
   
+  // Keep visible while hovering toolbar itself
   toolbar.addEventListener('mouseenter', () => {
     if (editorToolbarHideTimeout) {
       clearTimeout(editorToolbarHideTimeout);
     }
-    if (editorToolbarShowTimeout) {
-      clearTimeout(editorToolbarShowTimeout);
-    }
     toolbar.classList.add('visible');
   });
   
+  // Hide after 2 seconds when leaving toolbar
   toolbar.addEventListener('mouseleave', () => {
     editorToolbarHideTimeout = setTimeout(() => {
       toolbar.classList.remove('visible');
@@ -196,3 +256,18 @@ if (document.readyState === 'loading') {
 }
 
 window.setupEditorToolbarAutoHide = setupEditorToolbarAutoHide;
+
+// Helper function to switch Monaco theme
+window.switchMonacoTheme = (themeName) => {
+  if (window.MonacoThemeManager) {
+    const success = window.MonacoThemeManager.applyTheme(themeName);
+    if (success) {
+      console.log(`✓ Switched to theme: ${themeName}`);
+    } else {
+      console.error(`✗ Failed to switch to theme: ${themeName}`);
+    }
+    return success;
+  }
+  console.warn('MonacoThemeManager not available');
+  return false;
+};
