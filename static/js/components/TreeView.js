@@ -14,6 +14,7 @@ const TreeView = () => {
   const [sidebarCloseTimeout, setSidebarCloseTimeout] = useState(null);
   const [autoCompile, setAutoCompile] = useState(true); // Auto-compile on save
   const autoCompileRef = useRef(true); // Ref to track current value immediately
+  const autoSaveTimeoutRef = useRef(null); // Auto-save timeout
   
   const { addNotification, status } = useNotifications();
   
@@ -62,9 +63,34 @@ const TreeView = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeFilePath, isSaving, isCompiling]);
 
+  // Auto-save: Save 2 seconds after user stops typing
   useEffect(() => {
-    handleLoadDirectory();
-  }, []);
+    if (!window.monacoEditor || !activeFilePath) return;
+
+    const editor = window.monacoEditor;
+    const model = editor.getModel();
+    
+    if (!model) return;
+
+    const disposable = model.onDidChangeContent(() => {
+      // Clear existing timeout
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      
+      // Set new timeout for auto-save after 2 seconds
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        saveFile(true); // Pass true to indicate this is an auto-save
+      }, 2000);
+    });
+
+    return () => {
+      disposable.dispose();
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [activeFilePath]);
 
   useEffect(() => {
     setTreeData([]);
@@ -382,7 +408,7 @@ const TreeView = () => {
     }
   };
 
-  const saveFile = async () => {
+  const saveFile = async (isAutoSave = false) => {
     if (!activeFilePath) {
       addNotification('No file is currently open', 'error');
       return;
@@ -408,9 +434,9 @@ const TreeView = () => {
 
       addNotification('File saved successfully', 'success');
       
-      // Auto-compile if enabled and file is .tex (but not if already compiling)
-      console.log('Auto-compile check:', { autoCompile: autoCompileRef.current, isTexFile: activeFilePath.endsWith('.tex'), isCompiling });
-      if (autoCompileRef.current && activeFilePath.endsWith('.tex') && !isCompiling) {
+      // Auto-compile if enabled and file is .tex (but not if already compiling or auto-saving)
+      console.log('Auto-compile check:', { autoCompile: autoCompileRef.current, isTexFile: activeFilePath.endsWith('.tex'), isCompiling, isAutoSave });
+      if (!isAutoSave && autoCompileRef.current && activeFilePath.endsWith('.tex') && !isCompiling) {
         console.log('Triggering auto-compile');
         setTimeout(() => compileLatex(), 100);
       }
@@ -636,6 +662,10 @@ const TreeView = () => {
       ),
       React.createElement("div", { className: "vertical-splitter", id: "vertical-splitter" }),
       React.createElement("div", { className: "right-pane", id: "pdf-pane" },
+        isCompiling && React.createElement("div", { className: "compilation-overlay" },
+          React.createElement("div", { className: "spinner" }),
+          React.createElement("div", { className: "compilation-text" }, "Compiling LaTeX...")
+        ),
         React.createElement("div", { 
           id: "pdf-placeholder",
           className: "pdf-placeholder"
